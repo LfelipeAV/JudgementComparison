@@ -67,6 +67,8 @@ def save_results(paragraphs, similarity_scores):
     result_csv = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
     with open(result_csv, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
+
+        # Write the similarity scores sheet
         writer.writerow(["PDF 1 Paragraph", "PDF 2 Paragraph", "Similarity Score"])
         for i, similarity_score, j in similarity_scores:
             row = [
@@ -75,6 +77,17 @@ def save_results(paragraphs, similarity_scores):
                 similarity_score,
             ]
             writer.writerow(row)
+
+        # Write the paragraphs used for comparison sheets
+        writer.writerow([])  # Add an empty row as separator
+
+        writer.writerow(["PDF 1 Paragraphs Used for Comparison"])
+        writer.writerows([(p,) for p in paragraphs[0]])
+
+        writer.writerow([])  # Add an empty row as separator
+
+        writer.writerow(["PDF 2 Paragraphs Used for Comparison"])
+        writer.writerows([(p,) for p in paragraphs[1]])
 
     messagebox.showinfo("Results", "Results saved to {}".format(result_csv))
 
@@ -92,6 +105,8 @@ def run_code():
         if paragraphs:
             similarity_scores = calculate_similarity(paragraphs[0], paragraphs[1])
             save_results(paragraphs, similarity_scores)
+
+
 def select_pdf1():
     file_path = filedialog.askopenfilename()
     pdf_file1_path.set(file_path)
