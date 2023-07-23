@@ -69,7 +69,7 @@ def save_results(paragraphs, similarity_scores):
         writer = csv.writer(csvfile)
 
         # Write the similarity scores sheet
-        writer.writerow(["PDF 1 Paragraph", "PDF 2 Paragraph", "Similarity Score"])
+        writer.writerow(["PDF 1 Paragraphs used in comparison", "PDF 2 Paragraphs used in comparison", "Similarity Score"])
         for i, similarity_score, j in similarity_scores:
             row = [
                 paragraphs[0][i] if i < len(paragraphs[0]) else "",
@@ -81,17 +81,42 @@ def save_results(paragraphs, similarity_scores):
         # Write the paragraphs used for comparison sheets
         writer.writerow([])  # Add an empty row as separator
 
-        writer.writerow(["PDF 1 Paragraphs Used for Comparison"])
+        writer.writerow(["PDF 1 Paragraphs in order of appearance"])
         writer.writerows([(p,) for p in paragraphs[0]])
 
         writer.writerow([])  # Add an empty row as separator
 
-        writer.writerow(["PDF 2 Paragraphs Used for Comparison"])
+        writer.writerow(["PDF 2 Paragraphs in order of appearance"])
         writer.writerows([(p,) for p in paragraphs[1]])
+
+        # Write the matches found in each PDF
+        writer.writerow([])  # Add an empty row as separator
+
+        writer.writerow(["PDF 1 Matches"])
+        for paragraph in paragraphs[0]:
+            writer.writerows([(match,) for match in find_articles(paragraph)])
+
+        writer.writerow([])  # Add an empty row as separator
+
+        writer.writerow(["PDF 2 Matches"])
+        for paragraph in paragraphs[1]:
+            writer.writerows([(match,) for match in find_articles(paragraph)])
 
     messagebox.showinfo("Results", "Results saved to {}".format(result_csv))
 
+def run_code():
+    pdf_file_paths = [pdf_file1_path.get(), pdf_file2_path.get()]
+    if len(pdf_file_paths) == 2:
+        paragraphs = []
 
+        for path in pdf_file_paths:
+            extracted_text = extract_text_from_pdf(path)
+            results = find_articles(extracted_text)
+            paragraphs.append([str(result) for result in results])  # Convert tuples to strings
+
+        if paragraphs:
+            similarity_scores = calculate_similarity(paragraphs[0], paragraphs[1])
+            save_results(paragraphs, similarity_scores)
 def run_code():
     pdf_file_paths = [pdf_file1_path.get(), pdf_file2_path.get()]
     if len(pdf_file_paths) == 2:
