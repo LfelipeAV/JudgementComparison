@@ -5,6 +5,8 @@ import tkinter as tk
 from typing import List
 from tkinter import filedialog, messagebox
 import nltk
+import pandas as pd
+import xlsxwriter
 
 nltk.download('punkt')
 from nltk.tokenize import word_tokenize
@@ -22,18 +24,18 @@ def extract_text_from_pdf(pdf_file: str) -> str:
 
 def find_articles(text_content: str) -> List[str]:
     patterns = [
-        r"article\s+\d+\s+of[\w\s]+?(?=(?:\n\s*and\s+|\n\s*or\s+)?article\s+\d+\s+of|$)",
-        r"article\s+([\w\W]*?(?=(article?\s+\d+)|$))",
-        r"principle[\w\s]+\b",
-        r"EU\s+value of[\w\s]*\b"
+        (r"article\s+\d+\s+of[\w\s]+?(?=(?:\n\s*and\s+|\n\s*or\s+)?article\s+\d+\s+of|$)", "Article"),
+        (r"article\s+([\w\W]*?(?=(article?\s+\d+)|$))", "Article"),
+        (r"principle[\w\s]+\b", "Principle"),
+        (r"EU\s+value of[\w\s]*\b", "EU Value")
     ]
 
     matches = []
-    for pattern in patterns:
+    for pattern, match_type in patterns:
         pattern_matches = re.findall(pattern, text_content, re.IGNORECASE)
-        matches.extend(pattern_matches)
+        matches.extend([(match_type, match) for match in pattern_matches])
 
-    return [match for match in matches if match]
+    return [(match_type, match) for match_type, match in matches if match]
 
 
 def calculate_similarity(paragraphs1: List[str], paragraphs2: List[str]) -> List[float]:
@@ -63,46 +65,44 @@ def calculate_word_overlap(paragraph1: str, paragraph2: str) -> float:
     return similarity_score
 
 
+# ... (previous code remains the same)
+
 def save_results(paragraphs, similarity_scores):
-    result_csv = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
-    with open(result_csv, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.writer(csvfile)
+    result_excel = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx")])
+    writer = pd.ExcelWriter(result_excel, engine='xlsxwriter')
+    workbook = writer.book
 
-        # Write the similarity scores sheet
-        writer.writerow(["PDF 1 Paragraphs used in comparison", "PDF 2 Paragraphs used in comparison", "Similarity Score"])
-        for i, similarity_score, j in similarity_scores:
-            row = [
-                paragraphs[0][i] if i < len(paragraphs[0]) else "",
-                paragraphs[1][j] if j < len(paragraphs[1]) else "",
-                similarity_score,
-            ]
-            writer.writerow(row)
+    # Write the first sheet with paragraphs being compared, match type, and similarity score
+    first_sheet_name = "Comparison Results"
+    first_sheet = workbook.add_worksheet(first_sheet_name)
+    first_sheet.write(0, 0, "Match Type")
+    first_sheet.write(0, 1, "Match")
+    first_sheet.write(0, 2, "PDF 1 Paragraph")
+    first_sheet.write(0, 3, "PDF 2 Paragraph")
+    first_sheet.write(0, 4, "Similarity Score")
 
-        # Write the paragraphs used for comparison sheets
-        writer.writerow([])  # Add an empty row as separator
+    for i, (index1, similarity, index2) in enumerate(similarity_scores):
+        matches1 = find_articles(paragraphs[0][index1])
+        matches2 = find_articles(paragraphs[1][index2])
 
-        writer.writerow(["PDF 1 Paragraphs in order of appearance"])
-        writer.writerows([(p,) for p in paragraphs[0]])
+        match_type1, match1 = matches1[0] if matches1 else ("", "")  # Set default values if no matches found
+        match_type2, match2 = matches2[0] if matches2 else ("", "")  # Set default values if no matches found
 
-        writer.writerow([])  # Add an empty row as separator
+        first_sheet.write(i + 1, 0, match_type1)
+        first_sheet.write(i + 1, 1, str(match1))  # Convert tuple to string
+        first_sheet.write(i + 1, 2, paragraphs[0][index1])
+        first_sheet.write(i + 1, 3, paragraphs[1][index2])
+        first_sheet.write(i + 1, 4, similarity)
 
-        writer.writerow(["PDF 2 Paragraphs in order of appearance"])
-        writer.writerows([(p,) for p in paragraphs[1]])
+    # Write the paragraphs used for comparison sheets
+    pdf1_df = pd.DataFrame(paragraphs[0], columns=["PDF 1 Paragraphs in order of appearance"])
+    pdf1_df.to_excel(writer, sheet_name="PDF 1 Paragraphs", index=False)
 
-        # Write the matches found in each PDF
-        writer.writerow([])  # Add an empty row as separator
+    pdf2_df = pd.DataFrame(paragraphs[1], columns=["PDF 2 Paragraphs in order of appearance"])
+    pdf2_df.to_excel(writer, sheet_name="PDF 2 Paragraphs", index=False)
 
-        writer.writerow(["PDF 1 Matches"])
-        for paragraph in paragraphs[0]:
-            writer.writerows([(match,) for match in find_articles(paragraph)])
-
-        writer.writerow([])  # Add an empty row as separator
-
-        writer.writerow(["PDF 2 Matches"])
-        for paragraph in paragraphs[1]:
-            writer.writerows([(match,) for match in find_articles(paragraph)])
-
-    messagebox.showinfo("Results", "Results saved to {}".format(result_csv))
+    writer.close()
+    messagebox.showinfo("Results", "Results saved to {}".format(result_excel))
 
 def run_code():
     pdf_file_paths = [pdf_file1_path.get(), pdf_file2_path.get()]
